@@ -30,23 +30,74 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 detector = HandGestureDetector()
 gv = GestureViewer(socketio)
 
-# ----------------- Dynamic Model Setup ------
-MODEL_PATH = '../models/Dynamic.h5'
+import tensorflow as tf # Use tf.lite for inference
+import time
 
-# Hardcoded class labels (must match training order)
+# ... (rest of your imports remain the same)
+
+# ----------------- Dynamic Model Setup (TFLite) ------
+MODEL_PATH = '../models/dynamic.tflite'
 CLASSES = ["hello", "thanks", "bye", "good", "congrats"]
 
 try:
-    model = load_model(MODEL_PATH)
-    logger.info(f"Dynamic model loaded successfully with classes: {CLASSES}")
+    # 1. Load TFLite model and allocate tensors
+    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+
+    # Get input and output details for inference
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    
+    logger.info("Dynamic TFLite model loaded successfully.")
 except Exception as e:
-    logger.error(f"Failed to load model: {e}")
+    logger.error(f"Failed to load TFLite model: {e}")
     raise
 
-SEQUENCE_LENGTH = 20   # frames per sequence
-FEATURES = 1662       # features per frame
+SEQUENCE_LENGTH = 20   
+FEATURES = 1662       
 CONFIDENCE_THRESHOLD = 0.7
 
+# ----------- DYNAMIC GESTURE ROUTE (Optimized) -------------
+@app.route('/predict_dynamic', methods=['POST'])
+def predict_dynamic():
+    try:
+        start_time = time.time() # Start Latency Profiler
+        
+        data = request.json.get('sequence')
+        if not data or len(data) != SEQUENCE_LENGTH:
+            return jsonify({'error': 'Invalid sequence length'}), 400
+
+        # 2. Prepare Input Data (Optimize with float32)
+        # Reshape to (1, 20, 1662)
+        input_data = np.array(data, dtype=np.float32).reshape(1, SEQUENCE_LENGTH, FEATURES)
+
+        # 3. TFLite Inference Step
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.invoke()
+        
+        # 4. Get Output
+        preds = interpreter.get_tensor(output_details[0]['index'])[0]
+        
+        predicted_idx = int(np.argmax(preds))
+        confidence = float(preds[predicted_idx])
+
+        # Latency Calculation
+        latency_ms = (time.time() - start_time) * 1000
+        logger.info(f"Inference Latency: {latency_ms:.2f}ms")
+
+        if confidence < CONFIDENCE_THRESHOLD:
+            return jsonify({'gesture': 'Unknown', 'confidence': confidence, 'latency': latency_ms})
+
+        predicted_class = CLASSES[predicted_idx]
+        return jsonify({
+            'gesture': predicted_class, 
+            'confidence': confidence,
+            'latency': f"{latency_ms:.2f}ms"
+        })
+
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        return jsonify({'error': str(e)}), 500
 # ----------- STATIC GESTURE ROUTE -------------
 @app.route('/frame', methods=['POST'])
 def process_frame():
@@ -57,37 +108,6 @@ def process_frame():
 
     result = detector.process_frame(frame)
     return jsonify(result)
-
-# ----------- DYNAMIC GESTURE ROUTE -------------
-@app.route('/predict_dynamic', methods=['POST'])
-def predict_dynamic():
-    try:
-        data = request.json.get('sequence')
-        if not data:
-            return jsonify({'error': 'No sequence data provided'}), 400
-
-        if len(data) != SEQUENCE_LENGTH:
-            return jsonify({'error': f'Sequence must be {SEQUENCE_LENGTH} frames, got {len(data)}'}), 400
-
-        seq = np.array(data, dtype=np.float32).reshape(1, SEQUENCE_LENGTH, FEATURES)
-        if np.any(np.isnan(seq)) or np.any(np.isinf(seq)):
-            return jsonify({'error': 'Sequence contains NaN or infinite values'}), 400
-
-        preds = model.predict(seq, verbose=0)[0]
-        predicted_idx = int(np.argmax(preds))
-        confidence = float(preds[predicted_idx])
-
-        if confidence < CONFIDENCE_THRESHOLD:
-            return jsonify({'gesture': 'Unknown', 'confidence': confidence})
-
-        predicted_class = CLASSES[predicted_idx]
-        logger.info(f"Predicted {predicted_class} with confidence {confidence:.2f}")
-
-        return jsonify({'gesture': predicted_class, 'confidence': confidence})
-
-    except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        return jsonify({'error': str(e)}), 500
 
 # ----------- SPEECH TO GESTURE ROUTE -------------
 r = sr.Recognizer()
