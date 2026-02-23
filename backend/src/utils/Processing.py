@@ -8,17 +8,15 @@ from src.utils.finger_utils import finger_open, get_center, distance
 
 class HandGestureDetector:
     def __init__(self, model_path="../models/landmark_model.h5"):
-        # Load Mediapipe models
+        
         self.mp_hands = mp.solutions.hands
         self.model = load_model(model_path)
 
-        # Prediction classes
         self.classes = ['1', '2', '3', '4', '5', '6', '7', '8', '9',
                         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
                         'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                         'U', 'V', 'W', 'X', 'Y', 'Z']
 
-        # State variables
         self.last_pred = None
         self.word = ""
         self.buffer = ""
@@ -32,7 +30,7 @@ class HandGestureDetector:
         self.SPACE_DISPLAY_DURATION = 1.0
         self.space_added_time = 0
         self.prediction = None
-        # Initialize Mediapipe hands
+       
         self.hands = self.mp_hands.Hands(
             max_num_hands=2,
             model_complexity=1,
@@ -87,6 +85,7 @@ class HandGestureDetector:
                     self.space_count = 0
 
                 hand = handedness.classification[0].label
+                
                 cen_x, cen_y = get_center(hand_landmarks, w, h)
 
                 if hand == 'Left':
