@@ -21,6 +21,11 @@ mp_pose = mp.solutions.pose
 mp_hands = mp.solutions.hands
 
 def mediapipe_detection(image, mp_model):
+    """
+    Process an image using a MediaPipe model (Holistic).
+    Converts the internal color space from BGR to RGB for processing,
+    then back to BGR for output visualization.
+    """
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image_rgb.flags.writeable = False
     results = mp_model.process(image_rgb)
@@ -29,6 +34,10 @@ def mediapipe_detection(image, mp_model):
     return image_out, results
 
 def draw_styled_landmarks(image, results):
+    """
+    Draw default styled landmarks over the webcam feed.
+    Tracks face meshes, left and right hands, and full body pose.
+    """
     if results.pose_landmarks:
         mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
     if results.left_hand_landmarks:
@@ -39,6 +48,11 @@ def draw_styled_landmarks(image, results):
         mp_drawing.draw_landmarks(image, results.face_landmarks, mp_face_mesh.FACEMESH_TESSELATION)
 
 def extract_keypoints(results):
+    """
+    Extract coordinate values (x, y, z, visibility) for all detected landmarks.
+    Concatenates them into a flat unified numpy array for sequence prediction.
+    Zero-pads when a specific landmark grouping isn't visible.
+    """
     pose = np.array([[res.x, res.y, res.z, res.visibility]
                      for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
     face = np.array([[res.x, res.y, res.z]
