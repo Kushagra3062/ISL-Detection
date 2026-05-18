@@ -1,0 +1,3 @@
+VERSION: 0.10.33
+DIR: ['Image', 'ImageFormat', '__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__', '__version__', 'tasks']
+PATH: ['D:\\ISL-Detection\\ISL-Detection-Project\\.venv\\Lib\\site-packages\\mediapipe']

@@ -1,0 +1,74 @@
+name: Canary Deployment
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+    branches: [main]
+
+env:
+  ACR_NAME: isldetection
+  BACKEND_IMAGE: isldetection.azurecr.io/isl-backend
+  FRONTEND_IMAGE: isldetection.azurecr.io/isl-frontend
+
+jobs:
+  canary-deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: isl-detection-rg
+          cluster-name: isl-aks-cluster
+
+      # Step 1: Deploy canary (1 pod alongside 2 stable = ~33% traffic)
+      - name: Deploy Canary
+        run: |
+          export IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
+          envsubst < k8s/canary/canary-deployment.yaml | kubectl apply -f -
+          kubectl -n isl-detection rollout status deployment/backend-canary --timeout=120s
+
+      # Step 2: Monitor canary for 5 minutes
+      - name: Monitor Canary Health
+        run: |
+          echo "🔍 Monitoring canary for 5 minutes..."
+          sleep 300
+
+          # Check error rate from canary pod logs
+          ERROR_RATE=$(kubectl -n isl-detection logs -l version=canary --tail=1000 | \
+            grep -c "ERROR" || echo "0")
+          echo "Canary error count: $ERROR_RATE"
+
+          if [ "$ERROR_RATE" -gt 10 ]; then
+            echo "::error::Canary error rate too high ($ERROR_RATE errors). Rolling back."
+            kubectl -n isl-detection delete deployment backend-canary
+            exit 1
+          fi
+          echo "✅ Canary health check passed"
+
+      # Step 3: Promote canary → stable
+      - name: Promote to Stable
+        run: |
+          IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
+
+          # Update stable backend
+          kubectl -n isl-detection set image deployment/backend \
+            backend=${{ env.BACKEND_IMAGE }}:${IMAGE_TAG}
+          kubectl -n isl-detection rollout status deployment/backend --timeout=180s
+
+          # Update frontend
+          kubectl -n isl-detection set image deployment/frontend \
+            frontend=${{ env.FRONTEND_IMAGE }}:${IMAGE_TAG}
+          kubectl -n isl-detection rollout status deployment/frontend --timeout=120s
+
+          # Cleanup canary
+          kubectl -n isl-detection delete deployment backend-canary --ignore-not-found
+          echo "✅ Canary promoted to stable successfully"

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-canary
+  namespace: isl-detection
+  labels:
+    app: backend
+    version: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: backend
+        version: canary
+    spec:
+      containers:
+        - name: backend
+          image: isldetection.azurecr.io/isl-backend:${IMAGE_TAG}
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: isl-config
+            - secretRef:
+                name: isl-secrets
+          env:
+            - name: CANARY
+              value: "true"
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc

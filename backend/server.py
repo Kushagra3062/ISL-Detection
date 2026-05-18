@@ -1,3 +1,5 @@
+import os
+import atexit
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -6,14 +8,21 @@ import numpy as np
 import base64
 from src.utils.speech_to_text import GestureViewer
 from src.utils.Processing import HandGestureDetector
+from src.utils.wandb_logger import init_wandb, log_inference, log_error, finish
+from src.utils.mlflow_utils import init_mlflow
 import speech_recognition as sr
 import io
 from pydub import AudioSegment
 from pydub.utils import which
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
+
+# Initialize monitoring
+init_mlflow()
+init_wandb()
+atexit.register(finish)
 
 AudioSegment.converter = which("ffmpeg")
 AudioSegment.ffprobe = which("ffprobe")
@@ -25,14 +34,18 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 detector = HandGestureDetector()
 gv = GestureViewer(socketio)
 
-import tensorflow as tf 
+try:
+    from tflite_runtime.interpreter import Interpreter
+except ImportError:
+    import tensorflow as tf
+    Interpreter = tf.lite.Interpreter
 import time
 
-MODEL_PATH = '../models/dynamic.tflite'
+MODEL_PATH = os.getenv('MODEL_PATH', '../models/dynamic.tflite')
 CLASSES = ["hello", "thanks", "bye", "good", "congrats"]
 
 try:
-    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter = Interpreter(model_path=MODEL_PATH)
     interpreter.allocate_tensors()
 
     input_details = interpreter.get_input_details()
@@ -47,11 +60,17 @@ SEQUENCE_LENGTH = 20
 FEATURES = 1662       
 CONFIDENCE_THRESHOLD = 0.7
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health endpoint for K8s readiness/liveness probes."""
+    return jsonify({'status': 'healthy', 'model_loaded': True}), 200
+
+
 @app.route('/predict_dynamic', methods=['POST'])
 def predict_dynamic():
     try:
-        start_time = time.time() 
-        
+        start_time = time.time()
+
         data = request.json.get('sequence')
         if not data or len(data) != SEQUENCE_LENGTH:
             return jsonify({'error': 'Invalid sequence length'}), 400
@@ -60,9 +79,9 @@ def predict_dynamic():
 
         interpreter.set_tensor(input_details[0]['index'], input_data)
         interpreter.invoke()
-        
+
         preds = interpreter.get_tensor(output_details[0]['index'])[0]
-        
+
         predicted_idx = int(np.argmax(preds))
         confidence = float(preds[predicted_idx])
 
@@ -70,17 +89,20 @@ def predict_dynamic():
         logger.info(f"Inference Latency: {latency_ms:.2f}ms")
 
         if confidence < CONFIDENCE_THRESHOLD:
+            log_inference('Unknown', confidence, latency_ms, 'predict_dynamic')
             return jsonify({'gesture': 'Unknown', 'confidence': confidence, 'latency': latency_ms})
 
         predicted_class = CLASSES[predicted_idx]
+        log_inference(predicted_class, confidence, latency_ms, 'predict_dynamic')
         return jsonify({
-            'gesture': predicted_class, 
+            'gesture': predicted_class,
             'confidence': confidence,
             'latency': f"{latency_ms:.2f}ms"
         })
 
     except Exception as e:
         logger.error(f"Prediction error: {e}")
+        log_error('prediction_error', str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/frame', methods=['POST'])
@@ -126,4 +148,5 @@ def speech_to_gesture(data):
 
 # ----------------- Main ---------------------
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=5000)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

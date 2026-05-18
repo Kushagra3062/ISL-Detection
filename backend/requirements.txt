@@ -1,9 +1,8 @@
 # ── Core ML & Vision ──────────────────────
-opencv-python
-mediapipe>=0.10.9
+opencv-python-headless
+mediapipe==0.10.14
 numpy
-tensorflow<2.16
-protobuf<4
+tensorflow
 
 # ── Audio Processing ─────────────────────
 SpeechRecognition

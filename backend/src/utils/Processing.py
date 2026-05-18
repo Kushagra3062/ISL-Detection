@@ -1,15 +1,35 @@
 import cv2
+import os
 import mediapipe as mp
 import numpy as np
 import time
-from tensorflow.keras.models import load_model
+try:
+    from keras.models import load_model
+except ImportError:
+    from tensorflow.keras.models import load_model
 from src.utils.hands_utils import get_both_hands
 from src.utils.finger_utils import finger_open, get_center, distance
 
 class HandGestureDetector:
-    def __init__(self, model_path="../models/landmark_model.h5"):
-        
-        self.mp_hands = mp.solutions.hands
+    def __init__(self, model_path=None):
+        if model_path is None:
+            model_path = os.getenv('LANDMARK_MODEL_PATH', '../models/landmark_model.h5')
+
+        # Import mediapipe hands — handle both legacy and new module layouts
+        import importlib
+        for _mp_path in [
+            "mediapipe.solutions.hands",
+            "mediapipe.python.solutions.hands",
+        ]:
+            try:
+                self.mp_hands = importlib.import_module(_mp_path)
+                break
+            except (ImportError, ModuleNotFoundError):
+                continue
+        else:
+            # Final fallback: direct attribute access
+            self.mp_hands = mp.solutions.hands
+
         self.model = load_model(model_path)
 
         self.classes = ['1', '2', '3', '4', '5', '6', '7', '8', '9',

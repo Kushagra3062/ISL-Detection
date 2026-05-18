@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: isl-detection
+  labels:
+    app: backend
+    version: stable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+      version: stable
+  template:
+    metadata:
+      labels:
+        app: backend
+        version: stable
+    spec:
+      containers:
+        - name: backend
+          image: isldetection.azurecr.io/backend:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: isl-config
+            - secretRef:
+                name: isl-secrets
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc

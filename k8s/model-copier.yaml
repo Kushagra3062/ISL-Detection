@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: model-copier
+  namespace: isl-detection
+spec:
+  containers:
+  - name: alpine
+    image: alpine
+    command: ["sleep", "3600"]
+    volumeMounts:
+    - name: model-volume
+      mountPath: /app/models
+  volumes:
+  - name: model-volume
+    persistentVolumeClaim:
+      claimName: model-pvc
