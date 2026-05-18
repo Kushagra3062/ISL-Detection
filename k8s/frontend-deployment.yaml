@@ -20,6 +20,7 @@ spec:
           image: isldetection.azurecr.io/frontend:latest
           ports:
             - containerPort: 80
+            - containerPort: 443
           resources:
             requests:
               cpu: "100m"
