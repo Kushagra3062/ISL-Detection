@@ -9,6 +9,8 @@
 
 > **Real-time gesture recognition system combining static and dynamic hand gestures with audio-visual learning features for enhanced sign language communication.**
 
+> **🔴 Live Demo (Azure Kubernetes Service):** [http://48.194.106.0](http://48.194.106.0) *(Please allow a few seconds for the pods to wake up on first load)*
+
 ## 🎯 Overview
 
 This comprehensive gesture recognition system leverages deep learning to detect and classify both static hand gestures (numbers, alphabets) and dynamic gestures (words, commands) in real-time. Built with a modern web interface, the system includes innovative features like speech-to-GIF mapping and visual learning capabilities, making it an effective tool for sign language education and accessibility.
@@ -76,6 +78,16 @@ This comprehensive gesture recognition system leverages deep learning to detect 
 | HTML5/CSS3 | UI Structure & Styling | - |
 | Axios | HTTP Client | 0.27+ |
 
+### **Cloud & DevOps (New!)**
+| Technology | Purpose | 
+|------------|---------|
+| Azure Kubernetes Service (AKS) | Scalable Cloud Orchestration | 
+| Docker & Docker Compose | Containerization | 
+| Azure Container Registry (ACR) | Cloud Image Storage | 
+| Weights & Biases (W&B) | Live Training Metrics & Logging | 
+| MLflow | Model Registry & Versioning | 
+| GitHub Actions | CI/CD Pipelines | 
+
 ### **Data & Storage**
 | Technology | Purpose | Version |
 |------------|---------|---------|
@@ -138,6 +150,18 @@ npm start
 ```
 Frontend: http://localhost:3000
 Backend API: http://localhost:5000
+```
+
+### **Cloud Deployment (AKS)**
+This project is fully configured for cloud deployment on Azure Kubernetes Service.
+```bash
+# Push images to Azure Container Registry
+docker push <acr-name>.azurecr.io/backend:latest
+docker push <acr-name>.azurecr.io/frontend:latest
+
+# Deploy to Kubernetes
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/
 ```
 
 ## 📂 Project Structure
