@@ -108,7 +108,18 @@ def predict_dynamic():
 @app.route('/frame', methods=['POST'])
 def process_frame():
     data = request.get_json()
-    img_data = base64.b64decode(data['image'].split(',')[1])
+    if not data or 'image' not in data or not data['image']:
+        return jsonify({'error': 'No image provided'}), 400
+
+    image_str = data['image']
+    if ',' in image_str:
+        image_str = image_str.split(',')[1]
+
+    try:
+        img_data = base64.b64decode(image_str)
+    except Exception as e:
+        logger.error(f"Base64 decode error: {e}")
+        return jsonify({'error': 'Invalid image format'}), 400
     np_img = np.frombuffer(img_data, np.uint8)
     frame = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 
