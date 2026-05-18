@@ -11,8 +11,23 @@ function Webcamera() {
   const [Det, setDet] = useState(false);
 
   const sendframe = async () => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
+    if (webcamRef.current && webcamRef.current.video) {
+      const video = webcamRef.current.video;
+      if (video.readyState !== 4) return; // Ensure video is playing
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      
+      // Handle mirroring
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const imageSrc = canvas.toDataURL("image/jpeg", 0.8);
+      if (!imageSrc || imageSrc === "data:,") return;
+
       try {
         const response = await fetch("/api/frame", {
           method: "POST",
