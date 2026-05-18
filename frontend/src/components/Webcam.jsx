@@ -14,7 +14,7 @@ function Webcamera() {
     if (webcamRef.current) {
       const imageSrc = webcamRef.current.getScreenshot();
       try {
-        const response = await fetch("http://127.0.0.1:5000/frame", {
+        const response = await fetch("/api/frame", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: imageSrc }),

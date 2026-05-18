@@ -2,7 +2,7 @@ import React, { useState, useRef,useEffect } from "react";
 import { io } from "socket.io-client";
 import { Link } from "react-router-dom";
 
-const socket = io("http://127.0.0.1:5000");
+const socket = io("/");
 function SpeechToGesturesPage() {
   const [Result, setResult] = useState("");
   const [isRecording, setIsRecording] = useState(false);
