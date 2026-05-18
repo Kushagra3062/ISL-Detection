@@ -9,7 +9,7 @@
 
 > **Real-time gesture recognition system combining static and dynamic hand gestures with audio-visual learning features for enhanced sign language communication.**
 
-> **🔴 Live Demo (Azure Kubernetes Service):** [http://48.194.106.0](http://48.194.106.0) *(Please allow a few seconds for the pods to wake up on first load)*
+> **🔴 Live Demo (Azure Kubernetes Service):** [https://isl-detection-app.eastus.cloudapp.azure.com](https://isl-detection-app.eastus.cloudapp.azure.com) *(Accept the self-signed SSL warning to allow camera/mic access out of the box!)*
 
 ## 🎯 Overview
 
@@ -154,6 +154,7 @@ Backend API: http://localhost:5000
 
 ### **Cloud Deployment (AKS)**
 This project is fully configured for cloud deployment on Azure Kubernetes Service.
+
 ```bash
 # Push images to Azure Container Registry
 docker push <acr-name>.azurecr.io/backend:latest
@@ -163,6 +164,41 @@ docker push <acr-name>.azurecr.io/frontend:latest
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/
 ```
+
+### **🌐 Production Infrastructure & Architecture**
+
+The system is deployed on an **Azure Kubernetes Service (AKS)** cluster, specifically optimized for high-speed, low-latency video and audio stream parsing.
+
+```mermaid
+graph TD
+    Client[Browser Client]
+    LoadBalancer[Azure Public Load Balancer]
+    Nginx[Frontend Pod: Nginx Reverse Proxy]
+    React[React Static Files]
+    Backend[Backend Service]
+    Flask[Backend Pod: Flask API]
+    TFLite[TensorFlow & MediaPipe]
+    
+    Client -->|HTTPS Port 443 / HTTP Port 80| LoadBalancer
+    LoadBalancer -->|Traffic Distribution| Nginx
+    Nginx -->|Serves Static UI Assets| React
+    Nginx -->|Proxies /api/ requests| Backend
+    Backend -->|Forwards API Calls| Flask
+    Flask -->|Inference Loop| TFLite
+```
+
+#### **1. Azure Load Balancer**
+- Acts as a unified entry point with a static Azure Public IP.
+- Routes both **Port 80 (HTTP)** and **Port 443 (HTTPS)** directly to the Nginx containers inside the frontend pods.
+
+#### **2. Frontend Pod (Nginx Reverse Proxy & Static Web Server)**
+- **Self-Contained SSL**: Generates a self-signed SSL certificate directly inside the container during build-time. This satisfies the browser's **Secure Context** constraint, prompting users to grant webcam and microphone access automatically on load.
+- **In-Memory Frame Processing**: Configured with a dedicated memory buffer (`client_body_buffer_size 512k`). This forces Nginx to process raw base64 frame payloads purely in RAM, avoiding disk write overhead and boosting API speed.
+- **Unified Reverse Proxying**: Forwards REST API (`/api/*`) and WebSockets (`/socket.io/*`) to the backend, bypassing browser-side CORS policies.
+
+#### **3. Backend Service & Pods**
+- Communicates internally via a high-performance Kubernetes ClusterIP.
+- Runs parallel Python processes using eventlet/gunicorn, executing real-time landmark classification loops using MediaPipe and custom TensorFlow architectures.
 
 ## 📂 Project Structure
 
