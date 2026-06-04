@@ -1,7 +1,8 @@
+# ── Backend Ingress (HTTP backend) ─────────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: isl-ingress
+  name: isl-ingress-backend
   namespace: isl-detection
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
@@ -27,10 +28,24 @@ spec:
                 name: backend
                 port:
                   number: 5000
+---
+# ── Frontend Ingress (HTTPS backend) ───────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: isl-ingress-frontend
+  namespace: isl-detection
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: frontend-service
                 port:
-                  number: 80
+                  number: 443
